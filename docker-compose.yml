@@ -1,7 +1,7 @@
 version: "2"
 services:
   server:
-    image: vismayasolanki/backend
+    image: anshul1601/backend_image
     container_name: backend
     restart: always
     ports:
@@ -10,7 +10,7 @@ services:
       - mongo
       
   client:
-    image: vismayasolanki/frontend
+    image: anshul1601/frontend_image
     container_name: frontend
     restart: always
     ports:
@@ -21,6 +21,6 @@ services:
     container_name: mongo
     image: mongo
     volumes:
-      - /Users/vismayasolanki/Desktop/foodapp/data:/data/db
+      - mongo-data:/data/db
     ports:
       - "27017:27017"
