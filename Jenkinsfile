@@ -1,78 +1,77 @@
-pipeline {
-    agent any
+pipeline{
+agent any
+environment{
+    dockerhub=credentials('docker_hub')
+    PATH = "/opt/homebrew/bin:$PATH"
     
-    stages {
-        stage('Clean Workspace Cache') {
-            steps {
-                cleanWs()
-	    }
-        }
-        stage('Git Cloning') {
-            steps {
-                git 'https://github.com/yashadayal/ClarityPlusPackage.git'
-            }
-        }
-	stage('Unit Testing') {
-            steps {
-                script {
-                    def microservices = ['OrderMService', 'RecipientMService']
-                    for (folder in microservices) {
-                        dir(folder) {
-                            sh "/home/yasha/.sdkman/candidates/maven/current/bin/mvn clean test -DskipTests"
-                        }
-                    }
-                }
-            }
-        }
-        stage('Build Microservices Code') {
-            steps {
-                script {
-                    def microservices = ['OrderMService', 'RecipientMService', 'apigateway', 'eurekaServer']
-                    for (folder in microservices) {
-                        dir(folder) {
-                            sh "/home/yasha/.sdkman/candidates/maven/current/bin/mvn clean package -DskipTests"
-                        }
-                    }
-                }
-            }
-        }
-	stage('Build and Push Frontend Image') {
-            steps {
-                dir('Frontend') {
-                    sh 'docker build -t frontend:5.0 .'
-                }
-		withDockerRegistry([credentialsId: "Docker", url: ""]) {
-                    sh "docker push yasha145/claritypluspackage:5.0"
-                }
-            }
-        }
-        stage('Build and Push Backend Images') {
-            steps {
-                script {
-                    def dockerImageNames = ['eurekaserver', 'apigateway', 'recipient', 'order']
-                    def microservices = ['eurekaServer', 'apigateway', 'RecipientMService', 'OrderMService']
-                    def imageTag = '1.0'
-                    for (int i = 0; i < 4; i++) {
-                        def imageName = 'yasha145/claritypluspackage'
-                        dir(microservices[i])
-                        {
-                            echo "docker build -t ${dockerImageNames[i]}:${imageTag} ."
-                            sh "docker build -t ${dockerImageNames[i]}:${imageTag}  ."
-                            withDockerRegistry([credentialsId: "Docker", url: ""]) {
-                                sh "docker push ${imageName}:${imageTag}"
-                            }
-                        }
-                        imageTag = (imageTag.toDouble() + 1).toString()
-                    }
-                }
-            }
-        }
-        stage('Ansible Deploy') {
-		steps {
-			 sh "ansible-playbook -i inventory ansible-playbook.yml"
 
-		}
-	}
-    }
 }
+	stages{
+		stage("Git pull ")
+		{
+			steps
+			{ 
+			    git url:'https://github.com/vismayasolanki/SPE_MAJOR.git',branch:'master'
+			}
+		}
 
+		stage("Build Backend Docker Image")
+		{
+			steps
+			{
+				echo "build backend docker Image"
+				sh "/opt/homebrew/bin/docker build -t vismayasolanki/backend server/"
+			}
+		}
+
+		stage("Build Frontend Docker Image")
+		{
+			steps
+			{
+				echo "build frontend docker Image"
+				sh "/opt/homebrew/bin/docker build -t vismayasolanki/frontend client/"
+			}
+		}
+		stage("Login to Docker Hub")
+		{
+			steps
+			{
+				sh "/opt/homebrew/bin/docker logout"
+				sh "echo $dockerhub_PSW | /opt/homebrew/bin/docker login -u $dockerhub_USR --password-stdin"
+			}
+		}
+		stage("Push Backend Docker Image to Docker Hub")
+		{
+			steps
+			
+			{ 	echo "Push Backend Docker Image to Docker Hub"
+				sh "/opt/homebrew/bin/docker push vismayasolanki/backend"	
+			}
+		}
+
+		stage("Push Frontend Docker Image to Docker Hub")
+		{
+			steps
+			
+			{ 	echo "Push frontend Docker Image to Docker Hub"
+				sh "/opt/homebrew/bin/docker push vismayasolanki/frontend"	
+			}
+		}
+		stage("Removing Docker Images from Local ")
+		{
+			steps
+			{ 	echo "Removing Docker Images from Local"
+				sh "/opt/homebrew/bin/docker rmi vismayasolanki/frontend"
+				sh "/opt/homebrew/bin/docker rmi vismayasolanki/backend"	
+				}
+		}
+
+        stage('Ansible Deployment') {
+            steps {
+                script {
+                    sh 'ansible-playbook -i inventory deploy.yml'
+                }
+            }
+        }
+	}
+}
